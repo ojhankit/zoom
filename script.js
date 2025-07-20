@@ -18,62 +18,83 @@ const imageSources = [
 ].reverse();
 
 const images = [];
-let loadedCount = 0;
+let total = 0;
 
 imageSources.forEach((src, index) => {
   const img = new Image();
   img.src = src;
   img.onload = () => {
-    loadedCount++;
-    if (loadedCount === imageSources.length) {
+    total++;
+    if (total === imageSources.length) {
       startZoomLoop();
     }
   };
   images[index] = img;
 });
 
-let currentIndex = 0;
+let curr = 0;
 let scale = 1;
 
 function startZoomLoop() {
-  zoomImage(images[currentIndex]);
+  zoomImage(images[curr]);
 }
 
 function zoomImage(image) {
   scale = 1;
 
+  const nextIndex = (curr + 1) % images.length;
+  const nextImage = images[nextIndex];
+
   const canvasAspect = canvas.width / canvas.height;
-  const imgAspect = image.width / image.height;
 
-  let drawWidth, drawHeight;
-
-  if (imgAspect > canvasAspect) {
-    drawHeight = canvas.height;
-    drawWidth = image.width * (canvas.height / image.height);
-  } else {
-    drawWidth = canvas.width;
-    drawHeight = image.height * (canvas.width / image.width);
+  function getDrawSize(img) {
+    const imgAspect = img.width / img.height;
+    let width, height;
+    if (imgAspect > canvasAspect) {
+      height = canvas.height;
+      width = img.width * (canvas.height / img.height);
+    } else {
+      width = canvas.width;
+      height = img.height * (canvas.width / img.width);
+    }
+    return {
+      width: width,
+      height: height,
+      x: (canvas.width - width) / 2,
+      y: (canvas.height - height) / 2
+    };
   }
 
-  const x = (canvas.width - drawWidth) / 2;
-  const y = (canvas.height - drawHeight) / 2;
+  const currSize = getDrawSize(image);
+  const nextSize = getDrawSize(nextImage);
 
   gsap.to({ s: 1 }, {
-    s: 1.8, // zoom amount
-    duration: 3, // zoom duration
+    s: 1.8,
+    duration: 3,
     ease: "linear",
     onUpdate: function () {
+      const s = this.targets()[0].s;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       ctx.save();
+      ctx.globalAlpha = 0.3;
       ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.scale(this.targets()[0].s, this.targets()[0].s);
+      ctx.scale(s * 0.9, s * 0.9);
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
-      ctx.drawImage(image, x, y, drawWidth, drawHeight);
+      ctx.drawImage(nextImage, nextSize.x, nextSize.y, nextSize.width, nextSize.height);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(s, s);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(image, currSize.x, currSize.y, currSize.width, currSize.height);
       ctx.restore();
     },
     onComplete: () => {
-      currentIndex = (currentIndex + 1) % images.length;
-      zoomImage(images[currentIndex]);
+      curr = nextIndex;
+      zoomImage(images[curr]);
     }
   });
 }
